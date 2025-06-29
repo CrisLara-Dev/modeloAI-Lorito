@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+venv/
+.env
+simulacion_buses_500k_calidad.json
+modelo_estado_velocidad.pkl
