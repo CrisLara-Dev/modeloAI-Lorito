@@ -9,11 +9,10 @@ import json
 # ============================
 # 1️⃣ Conexión a MongoDB Atlas
 # ============================
-MONGO_URI = "mongodb+srv://crislaraarcos:123@database.5iimvyd.mongodb.net/"
-
+MONGO_URI = "mongodb+srv://benja15mz:123@bigdata.nmf477i.mongodb.net/"
 client = MongoClient(MONGO_URI)
 db = client["GPS"]
-collection = db["Gps"]
+collection = db["GPS"]
 
 cursor = collection.find()
 df = pd.DataFrame(list(cursor))

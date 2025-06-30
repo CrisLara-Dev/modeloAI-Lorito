@@ -1,15 +1,24 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
 import joblib
 from datetime import datetime
-from pymongo import MongoClient
 import json
 
 app = FastAPI(
     title="API Monitoreo Flota IA",
-    description="Predice el estado de velocidad de buses Lorito, consultando km_por_tramo_maximo automáticamente.",
-    version="1.0.1"
+    description="Predice el estado de velocidad de buses Lorito consultando datos desde resumen_local.xlsx sin Mongo.",
+    version="1.0.2"
+)
+
+# ======================= ✅ CORS para frontend =======================
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Cambiar en producción
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 class InputData(BaseModel):
@@ -22,64 +31,64 @@ class InputData(BaseModel):
     clima: str
     hora: int
 
-# =======================
-# 1️⃣ Cargar modelo y columnas al iniciar
-# =======================
+# ======================= 1️⃣ Cargar modelo y DataFrame resumen =======================
 model = None
 columns_reference = None
+df_resumen = None
 
 @app.on_event("startup")
-def load_model_and_columns():
-    global model, columns_reference
+def startup_event():
+    global model, columns_reference, df_resumen
+
+    # Cargar modelo
     model = joblib.load("modelo_estado_velocidad.pkl")
     print("✅ Modelo cargado correctamente.")
 
-    # Leer columnas de entrenamiento
+    # Cargar columnas de entrenamiento
     with open("columnas_entrenamiento.json", "r") as f:
         columns_reference = json.load(f)
     print("✅ Columnas de referencia cargadas.")
 
-    # Configurar conexión Mongo para uso en consultas
-    global mongo_client, collection
-    MONGO_URI = "mongodb+srv://benja15mz:123@database.5iimvyd.mongodb.net/"
-    mongo_client = MongoClient(MONGO_URI)
-    db = mongo_client["GPS"]
-    collection = db["Gps"]
-    print("✅ Conexión Mongo configurada para consultas de km_por_tramo_maximo.")
+    # Cargar resumen_global.xlsx en lugar de MongoDB
+    df_resumen = pd.read_excel("resumen_global.xlsx")
+    print("✅ Resumen Global cargado correctamente.")
 
 @app.get("/")
 def health_check():
     return {"status": "API funcionando correctamente 🚀"}
 
-# =======================
-# 2️⃣ Endpoint de predicción
-# =======================
+# ======================= 2️⃣ Endpoint de predicción =======================
 @app.post("/predict")
 def predict_estado(data: InputData):
-    # Consultar km_por_tramo_maximo automáticamente de la BD
-    tramo_info = collection.find_one(
-        {"ruta": data.ruta, "tramo": data.tramo},
-        {"km_por_tramo_maximo": 1}
-    )
+    global df_resumen
 
-    if not tramo_info or "km_por_tramo_maximo" not in tramo_info:
+    # Consultar km_por_tramo_maximo desde df_resumen
+    tramo_data = df_resumen[
+        (df_resumen["ruta"] == data.ruta) & (df_resumen["tramo"] == data.tramo)
+    ]
+
+    if tramo_data.empty:
         raise HTTPException(
             status_code=404,
-            detail=f"No se encontró km_por_tramo_maximo para {data.ruta} - {data.tramo}."
+            detail=f"No se encontró información para la ruta {data.ruta} y el tramo {data.tramo}."
         )
-    km_por_tramo_maximo = tramo_info["km_por_tramo_maximo"]
+
+    # ✅ USAR NOMBRE CORRECTO
+    km_por_tramo_maximo = tramo_data.iloc[0]["km_max_promedio"]
 
     # Crear DataFrame de entrada
     input_dict = data.dict()
-    input_dict["km_por_tramo_maximo"] = km_por_tramo_maximo  # Inyectar el valor consultado
+    input_dict["km_por_tramo_maximo"] = km_por_tramo_maximo
 
     df_input = pd.DataFrame([input_dict])
 
-    # Procesar columnas
+    # Procesar columnas como en el entrenamiento
     df_processed = pd.get_dummies(df_input)
     df_processed = df_processed.reindex(columns=columns_reference, fill_value=0)
 
+    # Predicción
     pred = model.predict(df_processed)[0]
+
     estado_map = {
         0: "Normal (0)",
         1: "Advertencia (1)",

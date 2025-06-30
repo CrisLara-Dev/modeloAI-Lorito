@@ -2,12 +2,12 @@ import pandas as pd
 from pymongo import MongoClient
 
 # ============================
-# 1️⃣ Cargar datos desde MongoDB o JSON local
+# 1️⃣ Cargar datos desde MongoDB
 # ============================
-MONGO_URI = "mongodb+srv://benja15mz:123@database.5iimvyd.mongodb.net/"
+MONGO_URI = "mongodb+srv://benja15mz:123@bigdata.nmf477i.mongodb.net/"
 client = MongoClient(MONGO_URI)
 db = client["GPS"]
-collection = db["Gps"]
+collection = db["GPS"]
 
 cursor = collection.find()
 df = pd.DataFrame(list(cursor))
@@ -41,7 +41,7 @@ print(f"\n✅ Total de buses distintos: {len(df_buses)}")
 print(df_buses.head())
 
 # ============================
-# 4️⃣ Crear tablas por ruta
+# 4️⃣ Preparar tablas por ruta
 # ============================
 columns_needed = ["ruta", "tramo", "km_por_tramo_minimo", "km_por_tramo_maximo", "temperatura_motor_c"]
 df_filtered = df[columns_needed + ['n_vehiculo']]
@@ -51,7 +51,7 @@ tabla_ruta_b = df_filtered[df_filtered["ruta"] == "Ruta B"].drop('ruta', axis=1)
 tabla_ruta_c = df_filtered[df_filtered["ruta"] == "Ruta C"].drop('ruta', axis=1)
 
 # ============================
-# 5️⃣ Cuadro resumen global
+# 5️⃣ Generar resumen global
 # ============================
 resumen_global = (
     df_filtered
@@ -67,14 +67,33 @@ resumen_global = (
     .sort_values(by=['ruta', 'tramo'])
 )
 
-print("\n✅ Cuadro resumen global generado:")
+print("\n✅ Resumen global generado:")
 print(resumen_global.head())
 
 # ============================
-# 6️⃣ Guardar en Excel
+# 6️⃣ Contar climas, estados de velocidad y días de semana
 # ============================
-import openpyxl
+conteo_clima = df['clima'].value_counts().reset_index()
+conteo_clima.columns = ['clima', 'cantidad']
 
+conteo_estado_velocidad = df['estado_velocidad'].value_counts().sort_index().reset_index()
+conteo_estado_velocidad.columns = ['estado_velocidad', 'cantidad']
+
+conteo_dias = df['dia_semana'].value_counts().reset_index()
+conteo_dias.columns = ['dia_semana', 'cantidad']
+
+print("\n✅ Conteo de climas:")
+print(conteo_clima)
+
+print("\n✅ Conteo de estados de velocidad:")
+print(conteo_estado_velocidad)
+
+print("\n✅ Conteo de días de semana:")
+print(conteo_dias)
+
+# ============================
+# 7️⃣ Guardar archivo tablas_por_ruta.xlsx
+# ============================
 with pd.ExcelWriter("tablas_por_ruta.xlsx", engine="openpyxl") as writer:
     tabla_ruta_a.to_excel(writer, sheet_name="Ruta A", index=False)
     tabla_ruta_b.to_excel(writer, sheet_name="Ruta B", index=False)
@@ -82,11 +101,16 @@ with pd.ExcelWriter("tablas_por_ruta.xlsx", engine="openpyxl") as writer:
     resumen_global.to_excel(writer, sheet_name="Resumen Global", index=False)
     df_rutas.to_excel(writer, sheet_name="Rutas", index=False)
     df_buses.to_excel(writer, sheet_name="Buses", index=False)
+    conteo_clima.to_excel(writer, sheet_name="Conteo Climas", index=False)
+    conteo_estado_velocidad.to_excel(writer, sheet_name="Conteo Estados", index=False)
+    conteo_dias.to_excel(writer, sheet_name="Conteo Dias", index=False)
 
-print("\n✅ Archivo 'tablas_por_ruta.xlsx' generado con:")
-print("- Hoja Ruta A")
-print("- Hoja Ruta B")
-print("- Hoja Ruta C")
-print("- Hoja Resumen Global")
-print("- Hoja Rutas")
-print("- Hoja Buses")
+print("\n✅ Archivo 'tablas_por_ruta.xlsx' generado con todas las hojas organizadas (incluyendo conteo de días).")
+
+# ============================
+# 8️⃣ Guardar archivo resumen_global.xlsx
+# ============================
+with pd.ExcelWriter("resumen_global.xlsx", engine="openpyxl") as writer:
+    resumen_global.to_excel(writer, sheet_name="Resumen Global", index=False)
+
+print("\n✅ Archivo 'resumen_global.xlsx' generado con el resumen global limpio.")

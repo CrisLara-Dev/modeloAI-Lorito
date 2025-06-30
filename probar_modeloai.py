@@ -17,7 +17,7 @@ input_data = {
     "ruta": ["Ruta B"],
     "tramo": ["Tramo B1"],
     "velocidad_kmh": [26],
-    "km_por_tramo_maximo": [24],
+    "km_por_tramo_maximo": [26],
     "temperatura_motor_c": [79],
     "dia_semana": ["Martes"],
     "clima": ["Nublado"],
@@ -30,10 +30,10 @@ df_input = pd.DataFrame(input_data)
 # ============================
 # 3️⃣ Obtener columnas de referencia desde MongoDB
 # ============================
-MONGO_URI = "mongodb+srv://benja15mz:123@database.5iimvyd.mongodb.net/"
+MONGO_URI = "mongodb+srv://benja15mz:123@bigdata.nmf477i.mongodb.net/"
 client = MongoClient(MONGO_URI)
 db = client["GPS"]
-collection = db["Gps"]
+collection = db["GPS"]
 
 cursor = collection.find().limit(1000)
 df_reference = pd.DataFrame(list(cursor))
