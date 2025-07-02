@@ -8,23 +8,23 @@ import os
 import gdown
 import json
 from datetime import datetime
-import time
-from typing import Optional
 
-# Variables globales
-model: Optional[object] = None
-columns_reference = None
-df_resumen = None
-initialized = False
+# ===== Descarga automática del modelo desde Google Drive si no existe =====
+MODEL_PATH = "estado_velocidad.pkl"
+GOOGLE_DRIVE_ID = "1I0rWEKvQ7Xg-NsrThvUw5MBojt2HWFen"
 
-# Primero definimos la app
+if not os.path.exists(MODEL_PATH):
+    print("Descargando modelo desde Google Drive...")
+    gdown.download(f"https://drive.google.com/uc?id={GOOGLE_DRIVE_ID}", MODEL_PATH, quiet=False)
+
+# ======================= ✅ CORS para frontend =======================
 app = FastAPI(
     title="API Monitoreo Flota IA",
     description="Predice el estado de velocidad de buses Lorito consultando datos desde resumen_local.xlsx sin Mongo.",
     version="1.0.2"
 )
 
-# Luego agregamos el middleware
+# ======================= ✅ CORS para frontend =======================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -33,7 +33,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ahora definimos el modelo de datos
 class InputData(BaseModel):
     n_vehiculo: str
     ruta: str
@@ -44,65 +43,31 @@ class InputData(BaseModel):
     clima: str
     hora: int
 
-# Configuración del modelo y archivos
-MODEL_PATH = "estado_velocidad.pkl"
-GOOGLE_DRIVE_ID = "1I0rWEKvQ7Xg-NsrThvUw5MBojt2HWFen"
+# ======================= 1️⃣ Cargar modelo y DataFrame resumen =======================
+model = None
+columns_reference = None
+df_resumen = None
 
-# Evento de inicio
 @app.on_event("startup")
-async def startup_event():
-    global model, columns_reference, df_resumen, initialized
-    if initialized:
-        return
-    
-    print("Iniciando proceso de carga...")
-    
-    # Esperar un poco para asegurar que el sistema esté listo
-    time.sleep(2)
-    
-    # Verificar y descargar modelo si no existe
-    if not os.path.exists(MODEL_PATH):
-        print("Descargando modelo desde Google Drive...")
-        try:
-            gdown.download(f"https://drive.google.com/uc?id={GOOGLE_DRIVE_ID}", MODEL_PATH, quiet=False)
-            print("✅ Modelo descargado exitosamente.")
-        except Exception as e:
-            print(f"Error al descargar el modelo: {str(e)}")
-            raise HTTPException(status_code=500, detail="Error al descargar el modelo")
-    
+def startup_event():
+    global model, columns_reference, df_resumen
+
     # Cargar modelo
-    try:
-        model = joblib.load(MODEL_PATH)
-        print("✅ Modelo cargado correctamente.")
-    except Exception as e:
-        print(f"Error al cargar el modelo: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error al cargar el modelo")
-
+    model = joblib.load("estado_velocidad.pkl")
     # Cargar columnas de entrenamiento
-    try:
-        with open("columnas_entrenamiento.json", "r") as f:
-            columns_reference = json.load(f)
-        print("✅ Columnas de referencia cargadas.")
-    except Exception as e:
-        print(f"Error al cargar columnas de referencia: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error al cargar columnas de referencia")
+    with open("columnas_entrenamiento.json", "r") as f:
+        columns_reference = json.load(f)
+    print("✅ Columnas de referencia cargadas.")
 
-    # Cargar resumen_global.xlsx
-    try:
-        df_resumen = pd.read_excel("resumen_global.xlsx")
-        print("✅ Resumen Global cargado correctamente.")
-    except Exception as e:
-        print(f"Error al cargar resumen global: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error al cargar resumen global")
+    # Cargar resumen_global.xlsx en lugar de MongoDB
+    df_resumen = pd.read_excel("resumen_global.xlsx")
+    print("✅ Resumen Global cargado correctamente.")
 
-    initialized = True
-
-# Endpoint principal
 @app.get("/")
 def health_check():
     return {"status": "API funcionando correctamente 🚀"}
 
-# Endpoint de predicción
+# ======================= 2️⃣ Endpoint de predicción =======================
 @app.post("/predict")
 def predict_estado(data: InputData):
     global df_resumen
@@ -118,6 +83,7 @@ def predict_estado(data: InputData):
             detail=f"No se encontró información para la ruta {data.ruta} y el tramo {data.tramo}."
         )
 
+    # ✅ USAR NOMBRE CORRECTO
     km_por_tramo_maximo = tramo_data.iloc[0]["km_max_promedio"]
 
     # Crear DataFrame de entrada

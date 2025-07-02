@@ -4,8 +4,3 @@ venv/
 .env
 simulacion_buses_500k_calidad.json
 modelo_estado_velocidad.pkl
-*.xlsx
-*.json
-*.py
-*.ipynb
-__pycache__/
