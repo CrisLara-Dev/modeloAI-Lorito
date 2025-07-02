@@ -8,14 +8,41 @@ import os
 import gdown
 import json
 from datetime import datetime
+import time
+from typing import Optional
 
 # ===== Descarga automática del modelo desde Google Drive si no existe =====
 MODEL_PATH = "estado_velocidad.pkl"
 GOOGLE_DRIVE_ID = "1I0rWEKvQ7Xg-NsrThvUw5MBojt2HWFen"
 
-if not os.path.exists(MODEL_PATH):
-    print("Descargando modelo desde Google Drive...")
-    gdown.download(f"https://drive.google.com/uc?id={GOOGLE_DRIVE_ID}", MODEL_PATH, quiet=False)
+# Variables globales
+model: Optional[object] = None
+
+@app.on_event("startup")
+async def startup_event():
+    global model
+    print("Iniciando proceso de carga...")
+    
+    # Esperar un poco para asegurar que el sistema esté listo
+    time.sleep(2)
+    
+    # Verificar y descargar modelo si no existe
+    if not os.path.exists(MODEL_PATH):
+        print("Descargando modelo desde Google Drive...")
+        try:
+            gdown.download(f"https://drive.google.com/uc?id={GOOGLE_DRIVE_ID}", MODEL_PATH, quiet=False)
+            print("✅ Modelo descargado exitosamente.")
+        except Exception as e:
+            print(f"Error al descargar el modelo: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error al descargar el modelo")
+    
+    # Cargar modelo
+    try:
+        model = joblib.load(MODEL_PATH)
+        print("✅ Modelo cargado correctamente.")
+    except Exception as e:
+        print(f"Error al cargar el modelo: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error al cargar el modelo")
 
 # ======================= ✅ CORS para frontend =======================
 app = FastAPI(
