@@ -1,11 +1,23 @@
+import pandas as pd
+import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import pandas as pd
 import joblib
-from datetime import datetime
+import os
+import gdown
 import json
+from datetime import datetime
 
+# ===== Descarga automática del modelo desde Google Drive si no existe =====
+MODEL_PATH = "estado_velocidad.pkl"
+GOOGLE_DRIVE_ID = "1I0rWEKvQ7Xg-NsrThvUw5MBojt2HWFen"
+
+if not os.path.exists(MODEL_PATH):
+    print("Descargando modelo desde Google Drive...")
+    gdown.download(f"https://drive.google.com/uc?id={GOOGLE_DRIVE_ID}", MODEL_PATH, quiet=False)
+
+# ======================= ✅ CORS para frontend =======================
 app = FastAPI(
     title="API Monitoreo Flota IA",
     description="Predice el estado de velocidad de buses Lorito consultando datos desde resumen_local.xlsx sin Mongo.",
@@ -15,7 +27,7 @@ app = FastAPI(
 # ======================= ✅ CORS para frontend =======================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Cambiar en producción
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,9 +53,7 @@ def startup_event():
     global model, columns_reference, df_resumen
 
     # Cargar modelo
-    model = joblib.load("modelo_estado_velocidad.pkl")
-    print("✅ Modelo cargado correctamente.")
-
+    model = joblib.load("estado_velocidad.pkl")
     # Cargar columnas de entrenamiento
     with open("columnas_entrenamiento.json", "r") as f:
         columns_reference = json.load(f)
