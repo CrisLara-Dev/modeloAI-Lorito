@@ -15,6 +15,7 @@ from typing import Optional
 model: Optional[object] = None
 columns_reference = None
 df_resumen = None
+initialized = False
 
 # Primero definimos la app
 app = FastAPI(
@@ -50,7 +51,10 @@ GOOGLE_DRIVE_ID = "1I0rWEKvQ7Xg-NsrThvUw5MBojt2HWFen"
 # Evento de inicio
 @app.on_event("startup")
 async def startup_event():
-    global model, columns_reference, df_resumen
+    global model, columns_reference, df_resumen, initialized
+    if initialized:
+        return
+    
     print("Iniciando proceso de carga...")
     
     # Esperar un poco para asegurar que el sistema esté listo
@@ -90,6 +94,8 @@ async def startup_event():
     except Exception as e:
         print(f"Error al cargar resumen global: {str(e)}")
         raise HTTPException(status_code=500, detail="Error al cargar resumen global")
+
+    initialized = True
 
 # Endpoint principal
 @app.get("/")
